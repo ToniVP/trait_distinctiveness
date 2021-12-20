@@ -243,6 +243,14 @@ format_trait = function(x) { #edit the function based on what should be cleaned 
   return(x)
   } #Function to unify categories of the traits
 
+mean_matrix<- function(x){
+  y <- array(unlist(x) , c(dim(x[[1]]),length(x)))
+  y <- apply( arr , 1:2 , mean )
+  colnames(y)<-colnames(x[[1]])
+  rownames(y)<-rownames(x[[1]])
+  return(y)
+} #Obtain the mean of each element from a list of matrices
+
 mean_diss = function(dist_matrix, data, status, Int_Di, num){
   
   if (all(is.na(match(colnames(data), rownames(status[which(status$status == "Non-indigenous"),]))))){NIS <- c()}
