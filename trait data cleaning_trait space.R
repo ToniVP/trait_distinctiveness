@@ -99,11 +99,8 @@ standr = function(x){(x-min(x))/(max(x)-min(x))} #Function to standardize
 int_distinct = function(trait){ #Here trait is a species x trait information matrix, previously cleaned 
   #and with the traits of interest selected
   
-  sensitivity.gow<-trait; sensitivity.gow[1:ncol(sensitivity.gow)] <- NULL
-  sum.standard.gow<-matrix(0,nrow(as.data.frame(trait)),nrow(as.data.frame(trait)))
-  rownames(sum.standard.gow)<-rownames(trait)
-  colnames(sum.standard.gow)<-rownames(trait)
-  sum.standard.gow<-as.data.frame(sum.standard.gow)
+  #sensitivity.gow<-trait; sensitivity.gow[1:ncol(sensitivity.gow)] <- NULL
+  dist.matr <- list()
   
   # Defining the total number of column : N; it MUST be 
   N<-ncol(trait)
@@ -157,14 +154,17 @@ int_distinct = function(trait){ #Here trait is a species x trait information mat
         m.gow<-as.matrix(gow)
         d.gow<-as.data.frame(m.gow)
         standard.gow<-standr(d.gow) # distances are standardized to fit between 1 and 0
-        standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
-        # average distance to the other species based on all trait combinations
-        standard.Di.gow<-as.data.frame(standard.Di.gow)
-        sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)
+        #standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
+        #average distance to the other species based on all trait combinations
+        #standard.Di.gow<-as.data.frame(standard.Di.gow)
+        #sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)
+        dist.matr <- c(dist.matr,list(standard.gow))
       }
       
       print (k)
     }
+    
+    dist_matrix <- as.data.frame(mean_matrix(dist.matr))
     
   }#end condition for more than 4 trait categories
   
@@ -174,27 +174,14 @@ int_distinct = function(trait){ #Here trait is a species x trait information mat
     gow<-compute_dist_matrix(trait, metric = "gower") # a distance matrix is calculated for each combination of traits
     m.gow<-as.matrix(gow)
     d.gow<-as.data.frame(m.gow)
-    standard.gow<-standr(d.gow) # distances are standardized to fit between 1 and 0
-    standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
+    dist_matrix<-standr(d.gow) # distances are standardized to fit between 1 and 0
+    #standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
     # average distance to the other species based on all trait combinations
-    standard.Di.gow<-as.data.frame(standard.Di.gow)
-    sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)} #end condition for less than 3 categories
+    #standard.Di.gow<-as.data.frame(standard.Di.gow)
+    #sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)
+  } #end condition for less than 3 categories
   
-  forIntDi<-t(sensitivity.gow); forIntDi<-na.omit(forIntDi); forIntDi<-as.matrix(t(forIntDi))
-  outputmatrix<-matrix(0,nrow(forIntDi),2)
-  
-  for (j in 1:nrow(forIntDi)){# start loop output matrix
-    
-    subset_sp<-forIntDi[j,1:ncol(forIntDi)]
-    subset_sp<-as.numeric(as.character(subset_sp))
-    outputmatrix[j,2]<-mean(subset_sp) #compute the mean for all the distances obtained via the combinations
-    
-  }#end loop output matrix
-  
-  Int_Di<-data.frame(outputmatrix); Int_Di[,1]<-rownames(forIntDi); colnames(Int_Di)<-c("taxon","int_Di"); 
-  #Int_Di<-Int_Di[order(Int_Di$int_Di,decreasing=T),]
-  
-  return(list(Int_Di, standard.gow))
+  return(dist_matrix)
 } #Function to calculate integrated distinctiveness
 
 convexe_hull<-function(poly){
@@ -245,7 +232,11 @@ format_trait = function(x) { #edit the function based on what should be cleaned 
 
 mean_matrix<- function(x){
   y <- array(unlist(x) , c(dim(x[[1]]),length(x)))
+<<<<<<< Updated upstream
   y <- apply( arr , 1:2 , mean )
+=======
+  y <- apply(y, 1:2 , mean )
+>>>>>>> Stashed changes
   colnames(y)<-colnames(x[[1]])
   rownames(y)<-rownames(x[[1]])
   return(y)
@@ -910,9 +901,13 @@ rel_abund <- as.data.frame(data %>%
                              summarise_at(.vars = "wet_weight", sum, na.rm = TRUE))
 
 rel_abund$rel.abund <- (rel_abund$wet_weight/sum(rel_abund$wet_weight))*100
+<<<<<<< Updated upstream
 rownames(rel_abund) <- rel_abund$taxon; rel_abund$taxon <- NULL; rel_abund$wet_weight <- NULL
 
 rel_abund <- rel_abund[which(!is.na(match(rownames(rel_abund),rownames(traitsFULL)))),]
+=======
+
+>>>>>>> Stashed changes
 
 data<-read.csv("species_abundance.txt",header=T,dec=".",sep="\t", check.names = FALSE)
 head(data)
@@ -999,12 +994,46 @@ head(Int_Di)
 Int_Di_gaw <- Int_Di
 
 #Distinctiveness index WEIGHTED BY RELATIVE ABUNDANCE
+<<<<<<< Updated upstream
 
 
 
 
 
 
+=======
+rel_abund <- rel_abund[which(!is.na(match(rel_abund$taxon,rownames(traitsFULL)))),]
+rownames(rel_abund) <- rel_abund$taxon; rel_abund$taxon <- NULL; rel_abund$wet_weight <- NULL
+
+dist_mat_w <- matrix(0, nrow(dist_matrix), ncol(dist_matrix)) 
+colnames(dist_mat_w) <- colnames(dist_matrix); rownames(dist_mat_w) <- rownames(dist_matrix)
+
+for (j in 1:ncol(dist_matrix)){
+  for(i in 1:nrow(dist_matrix)){
+    temp <- dist_matrix[i,j]*rel_abund[which(rownames(rel_abund) == rownames(dist_matrix[i,])),]
+    dist_mat_w[i,j] <- temp
+  }
+}
+
+#write.table(spe_index,file="spe_index.txt",sep="\t")
+
+weight.dist <- data.frame(dist = colSums(dist_mat_w))
+
+Int_Di_w <- data.frame(); 
+
+for(i in 1:ncol(dist_mat_w)){
+  sumDi <- weight.dist[which(rownames(weight.dist) == colnames(dist_mat_w)[i]),]
+  sumrelAB <- sum(rel_abund[-which(rownames(rel_abund) == colnames(dist_mat_w)[i]),])
+  
+  Di<-sumDi/sumrelAB
+  
+  temp <- data.frame(taxon = colnames(dist_mat_w)[i], Int_Di = Di)
+  Int_Di_w <- rbind(Int_Di_w, temp)
+}
+
+colnames(Int_Di_w)<-c("taxon","int_Di")
+Int_Di_gaw <- Int_Di_w
+>>>>>>> Stashed changes
 
 #Calculate axis for PCOA
 #Int_Di_gaw<- read.csv("Int_Di_gaw.txt",header=T,dec=".",sep="\t")
