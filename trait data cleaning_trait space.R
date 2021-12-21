@@ -902,6 +902,18 @@ c
 traitsFULL<-read.csv("Final_traits.txt",header=T,dec=".",sep="\t", check.names = FALSE)
 head(traitsFULL)
 
+data<-read.csv("Marenzelleria_1990_2020_CLEAN.txt",header=T,dec=".",sep="\t", check.names = FALSE)
+head(data)
+
+rel_abund <- as.data.frame(data %>% 
+                             group_by(taxon) %>% 
+                             summarise_at(.vars = "wet_weight", sum, na.rm = TRUE))
+
+rel_abund$rel.abund <- (rel_abund$wet_weight/sum(rel_abund$wet_weight))*100
+rownames(rel_abund) <- rel_abund$taxon; rel_abund$taxon <- NULL; rel_abund$wet_weight <- NULL
+
+rel_abund <- rel_abund[which(!is.na(match(rownames(rel_abund),rownames(traitsFULL)))),]
+
 data<-read.csv("species_abundance.txt",header=T,dec=".",sep="\t", check.names = FALSE)
 head(data)
 
@@ -962,12 +974,37 @@ cols <- match(colnames(standard.gaw),spe_index$species); cols <- which(!is.na(co
 #3.1.2: Using integrated distinctiveness #########
 
 #Here, "TRAIT" is a species x trait information matrix, previously cleaned and with the traits of interest selected
-results <- int_distinct(trait); dist_matrix <- as.data.frame(results[2]); Int_Di <- as.data.frame(results[1])
-colnames(dist_matrix) <- rownames(dist_matrix); dist_matrix[1:5,1:5]
+dist_matrix <- int_distinct(trait); dist_matrix[1:5,1:5] #obtain the distance matrix
+
+#Distinctiveness index NOT WEIGHTED BY RELATIVE ABUNDANCE
+
+standard.Di.gow<-colSums(dist_matrix)/(nrow(dist_matrix)-1) # Mean of the computed distances for each species, to obtain the
+#average distance to the other species based on all trait combinations
+standard.Di.gow<-as.data.frame(standard.Di.gow)
+forIntDi<-t(sensitivity.gow); forIntDi<-na.omit(forIntDi); forIntDi<-as.matrix(t(forIntDi))
+outputmatrix<-matrix(0,nrow(forIntDi),2)
+
+for (j in 1:nrow(forIntDi)){# start loop output matrix
+  
+  subset_sp<-forIntDi[j,1:ncol(forIntDi)]
+  subset_sp<-as.numeric(as.character(subset_sp))
+  outputmatrix[j,2]<-mean(subset_sp) #compute the mean for all the distances obtained via the combinations
+  
+}#end loop output matrix
+
+Int_Di<-data.frame(outputmatrix); Int_Di[,1]<-rownames(forIntDi); colnames(Int_Di)<-c("taxon","int_Di")
 head(Int_Di)
 #write.table(dist_matrix,file="dist_matrix_ALL.txt",sep="\t",row.names = TRUE)
 #write.table(Int_Di,file="Int_Di_gaw.txt",sep="\t")
 Int_Di_gaw <- Int_Di
+
+#Distinctiveness index WEIGHTED BY RELATIVE ABUNDANCE
+
+
+
+
+
+
 
 #Calculate axis for PCOA
 #Int_Di_gaw<- read.csv("Int_Di_gaw.txt",header=T,dec=".",sep="\t")
@@ -975,6 +1012,8 @@ colnames(Int_Di_gaw)[1] <- "taxon"
 
 spe_index = mutate(Int_Di_gaw, quartile = as.factor(ntile(Int_Di_gaw$int_Di,4)),decile = as.factor(ntile(Int_Di_gaw$int_Di,10)))
 #write.table(spe_index,file="spe_index.txt",sep="\t")
+
+
 
 #3.2: Calculate the axis of the PCOA to set the trait space + plots (TRAIT SPACE for the whole community) ##########
 dist_matrix<- read.csv("dist_matrix_ALL.txt",header=T,dec=".",sep="\t")
