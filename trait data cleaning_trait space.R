@@ -99,8 +99,11 @@ standr = function(x){(x-min(x))/(max(x)-min(x))} #Function to standardize
 int_distinct = function(trait){ #Here trait is a species x trait information matrix, previously cleaned 
   #and with the traits of interest selected
   
-  #sensitivity.gow<-trait; sensitivity.gow[1:ncol(sensitivity.gow)] <- NULL
-  dist.matr <- list()
+  sensitivity.gow<-trait; sensitivity.gow[1:ncol(sensitivity.gow)] <- NULL
+  sum.standard.gow<-matrix(0,nrow(as.data.frame(trait)),nrow(as.data.frame(trait)))
+  rownames(sum.standard.gow)<-rownames(trait)
+  colnames(sum.standard.gow)<-rownames(trait)
+  sum.standard.gow<-as.data.frame(sum.standard.gow)
   
   # Defining the total number of column : N; it MUST be 
   N<-ncol(trait)
@@ -153,18 +156,15 @@ int_distinct = function(trait){ #Here trait is a species x trait information mat
         gow<-compute_dist_matrix(data, metric = "gower") # a distance matrix is calculated for each combination of traits
         m.gow<-as.matrix(gow)
         d.gow<-as.data.frame(m.gow)
-        #standard.gow<-standr(d.gow) # distances are standardized to fit between 1 and 0
-        #standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
-        #average distance to the other species based on all trait combinations
-        #standard.Di.gow<-as.data.frame(standard.Di.gow)
-        #sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)
-        dist.matr <- c(dist.matr,list(d.gow))
+        standard.gow<-standr(d.gow) # distances are standardized to fit between 1 and 0
+        standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
+        # average distance to the other species based on all trait combinations
+        standard.Di.gow<-as.data.frame(standard.Di.gow)
+        sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)
       }
       
       print (k)
     }
-    
-    dist_matrix <- as.data.frame(mean_matrix(dist.matr))
     
   }#end condition for more than 4 trait categories
   
@@ -174,14 +174,27 @@ int_distinct = function(trait){ #Here trait is a species x trait information mat
     gow<-compute_dist_matrix(trait, metric = "gower") # a distance matrix is calculated for each combination of traits
     m.gow<-as.matrix(gow)
     d.gow<-as.data.frame(m.gow)
-    dist_matrix<-standr(d.gow) # distances are standardized to fit between 1 and 0
-    #standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
+    standard.gow<-standr(d.gow) # distances are standardized to fit between 1 and 0
+    standard.Di.gow<-colSums(standard.gow)/(nrow(standard.gow)-1) # Mean of the computed distances for each species, to obtain the
     # average distance to the other species based on all trait combinations
-    #standard.Di.gow<-as.data.frame(standard.Di.gow)
-    #sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)
-  } #end condition for less than 3 categories
+    standard.Di.gow<-as.data.frame(standard.Di.gow)
+    sensitivity.gow<-cbind(sensitivity.gow,standard.Di.gow)} #end condition for less than 3 categories
   
-  return(dist_matrix)
+  forIntDi<-t(sensitivity.gow); forIntDi<-na.omit(forIntDi); forIntDi<-as.matrix(t(forIntDi))
+  outputmatrix<-matrix(0,nrow(forIntDi),2)
+  
+  for (j in 1:nrow(forIntDi)){# start loop output matrix
+    
+    subset_sp<-forIntDi[j,1:ncol(forIntDi)]
+    subset_sp<-as.numeric(as.character(subset_sp))
+    outputmatrix[j,2]<-mean(subset_sp) #compute the mean for all the distances obtained via the combinations
+    
+  }#end loop output matrix
+  
+  Int_Di<-data.frame(outputmatrix); Int_Di[,1]<-rownames(forIntDi); colnames(Int_Di)<-c("taxon","int_Di"); 
+  #Int_Di<-Int_Di[order(Int_Di$int_Di,decreasing=T),]
+  
+  return(list(Int_Di, standard.gow))
 } #Function to calculate integrated distinctiveness
 
 convexe_hull<-function(poly){
@@ -230,14 +243,6 @@ format_trait = function(x) { #edit the function based on what should be cleaned 
   return(x)
   } #Function to unify categories of the traits
 
-mean_matrix<- function(x){
-  y <- array(unlist(x) , c(dim(x[[1]]),length(x)))
-  y <- apply(y, 1:2 , mean )
-  colnames(y)<-colnames(x[[1]])
-  rownames(y)<-rownames(x[[1]])
-  return(y)
-} #Obtain the mean of each element from a list of matrices
-
 mean_diss = function(dist_matrix, data, status, Int_Di, num){
   
   if (all(is.na(match(colnames(data), rownames(status[which(status$status == "Non-indigenous"),]))))){NIS <- c()}
@@ -264,73 +269,6 @@ mean_diss = function(dist_matrix, data, status, Int_Di, num){
 #data is the species occurrences/abundance data for a certain location/cell where we have different sampling locations
 #status is a list for all the species we have in TOTAL where their status (NIS or native) is defined
 #IntDi is the result of the integrated distinctiveness for all the species obtained previously
-
-mean_diss_rel_ab = function(dist_matrix, data, status, num){
-  
-  if(ncol(cols) > 1){
-    abund <- sum(data)
-    
-    rel_ab <- data.frame(t((sapply(data, function (x) (x/abund)*100)))); rownames(rel_ab)<-NULL
-    colnames(rel_ab) <- gsub("\\.", " ", colnames(rel_ab))
-    
-    if (all(is.na(match(colnames(data),rownames(status[which(status$status == "Non-indigenous"),]))))){
-      NIS <- c()} else {NIS <- c(colnames(data)[which(!is.na(match(colnames(data), 
-                                                                   rownames(status[which(status$status == "Non-indigenous"),]))))])}
-    
-    Allsp <- c(colnames(data)[num:ncol(data)]); Allsp <- gsub("\\.", " ", Allsp)
-    NAT <- setdiff(Allsp,NIS)
-    
-    #mean distance of NIS to other native species per each location/cell
-    if(length(NIS) == 0){NIS_Di <- NA} else {NIS_Di <- foreach(i = 1:length(NIS), .combine = cbind, .errorhandling = "pass") %dopar% {
-      dis <- c()
-      abj <- c()
-      for(j in 1:length(NAT)) {val <- dist_matrix[NIS[i],NAT[j]]; names(val) <- NAT[i]; dis <- c(dis,val)
-      ab <- rel_ab[,which(colnames(rel_ab) == NAT[j])]; abj<-c(abj,ab)
-      }
-      #dis <- mean(dis)
-      disW <- sum(dis*abj); DiW <- disW/sum(abj);  dist <- as.data.frame(DiW); colnames(dist) <- NIS[i]; dist}
-    }
-    
-    if(length(NAT) == 0){Di_NAT <- NA}
-    else{ Di_NAT <- c(); for (j in 1:length(NAT)){ #Here we multiply the functional pairwise distance by the relative abundance of each species
-      dis <- c()
-      abj <- c()
-      sp <- Allsp[!Allsp %in% NAT[j]]
-      for(i in 1:length(sp)){
-        val <- dist_matrix[sp[i],NAT[j]]; names(val) <- NAT[j]; dis <- c(dis,val)
-        ab <- rel_ab[,which(colnames(rel_ab) == sp[i])]; abj<-c(abj,ab)
-      }
-      disW <- sum(dis*abj); DiW <- disW/sum(abj);  dist <- as.data.frame(DiW); colnames(dist) <- NAT[j] 
-      Di_NAT <- c(Di_NAT,dist)
-    }
-    Di_NAT <- unlist(Di_NAT); Di_NAT <- mean(Di_NAT)
-    #val <- Int_Di[which(!is.na(match(Int_Di$taxon,NAT))),]
-    #Di_NAT <- mean(Di_NAT)
-    }
-    
-    Di_ovrll<-c()
-    for (j in 1:length(Allsp)){ #Here we multiply the functional pairwise distance by the relative abundance of each species
-      dis <- c()
-      abj <- c()
-      sp <- Allsp[!Allsp %in% Allsp[j]]
-      for(i in 1:length(sp)){
-        val <- dist_matrix[sp[i],Allsp[j]]; names(val) <- Allsp[j]; dis <- c(dis,val)
-        ab <- rel_ab[,which(colnames(rel_ab) == sp[i])]; abj<-c(abj,ab)
-      }
-      disW <- sum(dis*abj); DiW <- disW/sum(abj);  dist <- as.data.frame(DiW); colnames(dist) <- Allsp[j] 
-      Di_ovrll <- c(Di_ovrll,dist)
-    }
-    Di_ovrll <- unlist(Di_ovrll); Di_ovrll <- mean(Di_ovrll)
-    # val <- Int_Di[which(!is.na(match(Int_Di$taxon,Allsp))),]
-    # Di_ovrll <- mean(val$int_Di)
-  } else {NIS_Di = NA; Di_NAT = NA; Di_ovrll = NA}
-  
-  return(list(NIS_Di, Di_NAT, Di_ovrll))
-}#Function to calculate distinctiveness between different species groups by relative abundance
-#dist_matrix accounts for a pairwise matrix of integrated distinctiveness (functional distances)
-#data is the species occurrences/abundance data for a certain location/cell where we have different sampling locations
-#status is a list for all the species we have in TOTAL where their status (NIS or native) is defined
-
 
 MM <- function(k, z, x){
   y <- k*x/(z+x)
@@ -801,8 +739,6 @@ sample.mat[is.na(sample.mat)] <- 0
 
 #write.table(sample.mat, "species_abundance.txt", sep="\t")
 
-prova <- sample.mat[which(sample.mat$station == "915"),]
-
 
 #Obtain the relative abundance matrix for a specific year
 data<- read.csv("species_abundance.txt",header=T,dec=".",sep="\t", check.names = FALSE)
@@ -958,16 +894,6 @@ c
 traitsFULL<-read.csv("Final_traits.txt",header=T,dec=".",sep="\t", check.names = FALSE)
 head(traitsFULL)
 
-data<-read.csv("Marenzelleria_1990_2020_CLEAN.txt",header=T,dec=".",sep="\t", check.names = FALSE)
-head(data)
-
-rel_abund <- as.data.frame(data %>% 
-                             group_by(taxon) %>% 
-                             summarise_at(.vars = "wet_weight", sum, na.rm = TRUE))
-
-rel_abund$rel.abund <- (rel_abund$wet_weight/sum(rel_abund$wet_weight))*100
-
-
 data<-read.csv("species_abundance.txt",header=T,dec=".",sep="\t", check.names = FALSE)
 head(data)
 
@@ -1028,67 +954,12 @@ cols <- match(colnames(standard.gaw),spe_index$species); cols <- which(!is.na(co
 #3.1.2: Using integrated distinctiveness #########
 
 #Here, "TRAIT" is a species x trait information matrix, previously cleaned and with the traits of interest selected
-dist_matrix <- int_distinct(trait); dist_matrix[1:5,1:5] #obtain the distance matrix
-#write.table(dist_matrix,file="dist_matrix_ALL.txt",sep="\t",row.names = TRUE)
-
-#Distinctiveness index NOT WEIGHTED BY RELATIVE ABUNDANCE----------------
-
-dist_matrix<-standr(dist_matrix) # distances are standardized to fit between 1 and 0
-standard.Di.gow<-colSums(dist_matrix)/(nrow(dist_matrix)-1) # Mean of the computed distances for each species, to obtain the
-#average distance to the other species based on all trait combinations
-standard.Di.gow<-as.data.frame(standard.Di.gow)
-forIntDi<-t(sensitivity.gow); forIntDi<-na.omit(forIntDi); forIntDi<-as.matrix(t(forIntDi))
-outputmatrix<-matrix(0,nrow(forIntDi),2)
-
-for (j in 1:nrow(forIntDi)){# start loop output matrix
-  
-  subset_sp<-forIntDi[j,1:ncol(forIntDi)]
-  subset_sp<-as.numeric(as.character(subset_sp))
-  outputmatrix[j,2]<-mean(subset_sp) #compute the mean for all the distances obtained via the combinations
-  
-}#end loop output matrix
-
-Int_Di<-data.frame(outputmatrix); Int_Di[,1]<-rownames(forIntDi); colnames(Int_Di)<-c("taxon","int_Di")
+results <- int_distinct(trait); dist_matrix <- as.data.frame(results[2]); Int_Di <- as.data.frame(results[1])
+colnames(dist_matrix) <- rownames(dist_matrix); dist_matrix[1:5,1:5]
 head(Int_Di)
-
+#write.table(dist_matrix,file="dist_matrix_ALL.txt",sep="\t",row.names = TRUE)
 #write.table(Int_Di,file="Int_Di_gaw.txt",sep="\t")
 Int_Di_gaw <- Int_Di
-
-#Distinctiveness index WEIGHTED BY RELATIVE ABUNDANCE----------------
-
-rel_abund <- rel_abund[which(!is.na(match(rel_abund$taxon,rownames(traitsFULL)))),]
-rownames(rel_abund) <- rel_abund$taxon; rel_abund$taxon <- NULL; rel_abund$wet_weight <- NULL
-
-dist_mat_w <- matrix(0, nrow(dist_matrix), ncol(dist_matrix)) 
-colnames(dist_mat_w) <- colnames(dist_matrix); rownames(dist_mat_w) <- rownames(dist_matrix)
-
-for (j in 1:ncol(dist_matrix)){ #Here we multiply the functional pairwise distance by the relative abundance of each species
-  for(i in 1:nrow(dist_matrix)){
-    temp <- dist_matrix[i,j]*rel_abund[which(rownames(rel_abund) == rownames(dist_matrix[i,])),]
-    dist_mat_w[i,j] <- temp
-  }
-}
-
-dist_mat_st <- standr(dist_mat_w)
-#write.table(dist_mat_w,file="dist_mat_w.txt",sep="\t")
-
-weight.dist <- data.frame(dist = colSums(dist_mat_w))
-
-Int_Di_w <- data.frame(); 
-
-#Di weighted by species abundances
-for(i in 1:ncol(dist_mat_w)){
-  sumDi <- weight.dist[which(rownames(weight.dist) == colnames(dist_mat_w)[i]),] #Here we multiply the functional distance 
-  sumrelAB <- sum(rel_abund[-which(rownames(rel_abund) == colnames(dist_mat_w)[i]),])
-  
-  Di<-sumDi/sumrelAB
-  
-  temp <- data.frame(taxon = colnames(dist_mat_w)[i], Int_Di = Di)
-  Int_Di_w <- rbind(Int_Di_w, temp)
-}
-
-colnames(Int_Di_w)<-c("taxon","int_Di")
-Int_Di_gaw <- Int_Di_w
 
 #Calculate axis for PCOA
 #Int_Di_gaw<- read.csv("Int_Di_gaw.txt",header=T,dec=".",sep="\t")
@@ -1099,7 +970,6 @@ spe_index = mutate(Int_Di_gaw, quartile = as.factor(ntile(Int_Di_gaw$int_Di,4)),
 
 #3.2: Calculate the axis of the PCOA to set the trait space + plots (TRAIT SPACE for the whole community) ##########
 dist_matrix<- read.csv("dist_matrix_ALL.txt",header=T,dec=".",sep="\t")
-dist_matrix <- standr(dist_matrix)
 gaw.pco<-cmdscale(dist_matrix, eig = T) #change the name here depending if you used gawdis (standard.gaw) 
                                          #or integrated disctinctiveness (standard.gow)
 
@@ -1184,7 +1054,7 @@ c <- ggplot(aes(PCOA1,PCOA2,color = funct$group), data=df1)+
                             aes(colour=(grp_ch$group[grp_ch$group=="common"|grp_ch$group=="distinct"])), alpha = 0.1)
 c
 
-#ggsave(file="Trait_space.svg", plot=c, width=4200, height= 3000, units = "px")
+ggsave(file="Trait_space.svg", plot=c, width=4200, height= 3000, units = "px")
 
 #3.3: Calculate the effect that each trait has on the distance between species #######
 taxon<-rownames(trait)
@@ -1282,57 +1152,44 @@ system.time(for(j in 1:nrow(data)){#start loop inside each station
 
 })#end loop inside each station
 
-system.time(stationDi <- foreach(t = 1:nrow(data), .packages = c("dplyr", "vegan",
-                                                                 "data.table","raster",
-                                                                 "doParallel","foreach", "FD"), .errorhandling = "pass")%dopar%{#start loop inside each station
-                                                                   
-tryCatch({
- #sample.mat<- data[which(data$station_year == st_yr[t]),]
- sample.mat <- data[t,]
- cols <- sample.mat[,5:ncol(sample.mat)]; num = 1
-                                                                     
- #calculate NIS mean distinctiveness, distinctiveness x cell and distinctiveness x cell excluding NIS
- if (length(cols[,which(colSums(cols)> 0)]) > 1){cols <- cols[,which(colSums(cols)> 0)]} else {name = colnames(cols)[which(colSums(cols)> 0)]; 
- cols <- as.data.frame(cols[,which(colSums(cols)> 0)]); colnames(cols) <- name}
-                                                                     
- results <- mean_diss_rel_ab(dist_matrix, cols, traitraw, num)
- Di <- as.data.frame(results[1]); Di_NAT <- data.frame(non_NIS_Di =results[[2]]); Di_ovrll <- data.frame(overall_Di = results[[3]])
- distances <- cbind(Di,Di_NAT,Di_ovrll)
-                                                                     
- #calculate functional diversity metrics, FRichness, FEveness, FDivergence, Rao's Q...
- traitcomm <- trait[c(colnames(cols)),]
- if (ncol(cols) > 1){Fmetrics <- dbFD(traitcomm,cols,messages = FALSE,m = "max",
-                                      calc.FRic = TRUE, calc.FDiv = TRUE); 
-                                                                     
- FD <- lapply(Fmetrics[c(1:3,5:8)], mean, na.rm = TRUE);
- FDiv <- as.data.frame(do.call(cbind,FD))} else {FDiv <- NA}
-                                                                     
- #Diversity metrics: Shannon, eveness...
- Sh<-diversity(cols, index = "shannon", MARGIN = 1, base =exp(1))
- S<-diversity(cols, index = "simpson", MARGIN = 1, base =exp(1))
- Richness <- ncol(cols) #the columns are all the species present in the location
- J<-Sh/log(Richness)
- divers <- data.frame(richness = Richness, Shannon = Sh, Simpson = S, Eveness = J)
-                                                                     
- #Bind all the computed metrics
- metrics <- cbind(distances, FDiv);metrics <- cbind(metrics, divers)
- metrics <- metrics %>% select_if(~!all(is.na(.)))
-                                                                     
- }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-                                                                   
- print(paste(round((t/nrow(data))*100,digits = 3),"%")); rm(sample.mat, traitcomm,results,FD,
-                                                            FDiv,Di,Di_NAT,Di_ovrll, distances, Fmetrics, cols)
-                                                                   
- data.frame(cbind (station = as.factor(data$station[t]), year = as.factor(data$year[t]),
-                   lon = data$lon[t],lat = data$lat[t], metrics))
- })
-
-stationdi <- do.call(bind_rows, stationDi); #stationdi$FRic <- standr(stationdi$FRic)
-
-stationdi <- stationdi[which(stationdi$richness != 1),] #delete those stations that only have one species
-stationdi$station_year <- paste(stationdi$station,stationdi$year, sep = "_") 
-stationdi$station_year <- as.factor(stationdi$station_year)
-stationdi <- stationdi[!duplicated(stationdi$station_year),] #delete duplicated stations
+system.time(stationDi <- foreach(j = 1:nrow(data), .packages = c("dplyr", "vegan",
+                                                                    "data.table","raster",
+                                                                    "doParallel","foreach", "FD"), .errorhandling = "pass")%dopar%{#start loop inside each station
+  
+  tryCatch({
+    #sample.mat<- subset(data, station_year==st_yr[j])
+    sample.mat <- data[j,]
+    cols <- sample.mat[,6:ncol(sample.mat)-1]; num = 1
+    
+    #calculate NIS mean distinctiveness, distinctiveness x cell and distinctiveness x cell excluding NIS
+    if (length(cols[,which(colSums(cols)> 0)]) > 1){cols <- cols[,which(colSums(cols)> 0)]} else {name = colnames(cols)[which(colSums(cols)> 0)]; 
+    cols <- as.data.frame(cols[,which(colSums(cols)> 0)]); colnames(cols) <- name}
+    
+    results <- mean_diss(dist_matrix, cols, traitraw, Int_Di, num)
+    Di <- as.data.frame(results[1]); Di_NAT <- data.frame(non_NIS_Di =results[[2]]); Di_ovrll <- data.frame(overall_Di = results[[3]])
+    distances <- cbind(Di,Di_NAT,Di_ovrll)
+    
+    #calculate diversity metrics, species richness, FRichness, FEveness, FDivergence, Rao's Q...
+    traitcomm <- trait[c(colnames(cols)),]
+    if (ncol(cols) > 1){Fmetrics <- dbFD(traitcomm,cols,messages = FALSE,m = "max",
+                                         calc.FRic = TRUE, calc.FDiv = TRUE, stand.FRic = T); 
+    #Richness <- ncol(cols); 
+    FD <- lapply(Fmetrics[c(1:3,5:8)], mean, na.rm = TRUE);
+    FDiv <- as.data.frame(do.call(cbind,FD))} else {FDiv <- NA}
+    
+    Richness <- ncol(cols)
+    
+    metrics <- cbind(distances, FDiv)
+    metrics <- metrics %>% select_if(~!all(is.na(.)))
+    
+    temp <- data.frame(cbind (station = as.factor(sample.mat$station[1]), year = as.factor(sample.mat$year[1]),
+                              lon = sample.mat$lon[1],lat = sample.mat$lat[1], Richness = as.numeric(Richness), metrics))}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  
+  print(paste(round((j/length(st_yr))*100,digits = 3),"%")); rm(sample.mat, traitcomm,results,FD,FDiv,Di,Di_NAT,
+                                                                Di_ovrll, distances, metrics, Fmetrics, cols)
+  temp
+})
+stationdi <- do.call(bind_rows, stationDi)
 
 #write.table(stationdi,file="Di_metrics_station.txt",sep="\t", row.names = TRUE)
 
